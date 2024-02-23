@@ -1,0 +1,25 @@
+defaults:
+  - dataset: moving_mnist
+  - manifold: ellipsoid
+  - model: two_stage_linear
+  - optimizer: adam
+
+experiment_name: ${now:%Y-%m-%d_%H-%M-%S}
+seed: 42
+cpu: false
+mixed_precision: 'no'
+learning_rate: 0.001
+epochs: 51 # One extra epoch for the final evaluation
+
+# Dataloader 
+shuffle: true
+num_workers: 4
+pin_memory: true
+batch_size: 64
+
+hydra:
+  run:
+    dir: ${oc.env:EXPERIMENT_ROOT}/${hydra.job.name}/${experiment_name}
+  sweep:
+    dir: ${oc.env:EXPERIMENT_ROOT}/multirun
+    subdir: ${experiment_name}/${hydra.job.override_dirname}

@@ -1,0 +1,16 @@
+encoder:
+  type: resnet18
+  weights: null
+  kwargs:
+    pretrained: false
+    in_chans: 1
+    num_classes: 0
+    global_pool: ''
+
+classification_type: linear
+classification_kwargs: 
+  in_features: 2048
+  out_features: 10
+
+autoregresssive_type: null
+autoregresssive_kwargs: {}

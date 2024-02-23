@@ -1,0 +1,13 @@
+train_kwargs:
+  root: ${oc.env:EXPERIMENT_ROOT}/data
+  split: "train"
+  download: true
+
+train_name: "moving_mnist"
+
+val_kwargs:
+  root: ${oc.env:EXPERIMENT_ROOT}/data
+  split: "test"
+  download: true
+
+val_name: "moving_mnist"

@@ -1,0 +1,14 @@
+train_kwargs:
+  root: ${oc.env:EXPERIMENT_ROOT}/data
+  train: true
+  download: true
+
+train_name: "mnist"
+
+val_kwargs:
+  root: ${oc.env:EXPERIMENT_ROOT}/data
+  train: false
+  download: true
+
+val_name: "mnist"
+

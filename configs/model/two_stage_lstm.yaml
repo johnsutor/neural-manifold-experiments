@@ -1,0 +1,17 @@
+encoder:
+  type: resnet18
+  weights: null
+  kwargs:
+    pretrained: false
+    in_chans: 1
+    num_classes: 0
+    global_pool: ''
+
+classification_type: null
+classification_kwargs: {}
+
+autoregresssive_type: lstm
+autoregresssive_kwargs:
+  input_size: 2048
+  hidden_size: 2048
+  num_layers: 1
