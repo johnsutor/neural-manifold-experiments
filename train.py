@@ -56,6 +56,14 @@ def train(cfg: OmegaConf):
         if OmegaConf.select(cfg, "model.autoregressive_type")
         else None,
     )
+
+    # Freeze layers up until the specified layer, if present
+    if  OmegaConf.select(cfg, "model.model.freeze_until"):
+        for name, param in model.named_parameters():
+            if cfg.model.freeze_until != "all" and cfg.model.freeze_until in name:
+                break
+            param.requires_grad = False
+    
     model = model.to(accelerator.device)
 
     # Load dataset

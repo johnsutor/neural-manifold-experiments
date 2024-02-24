@@ -89,9 +89,9 @@ class TwoStageTwoHeadPredictor(nn.Module):
 
         autoregressive_loss = 0.0
         if self.autoregressive_head is not None:
-            autoregressive_pred = self.autoregressive_head(latents)
+            autoregressive_pred, *_ = self.autoregressive_head(latents)
             autoregressive_loss = F.mse_loss(
-                autoregressive_pred[:, :-1, :], latents[:, 1:, :]
+                autoregressive_pred[:, -2, :], latents[:, -1, :]
             )
 
         return linear_loss + autoregressive_loss
