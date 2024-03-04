@@ -5,6 +5,7 @@ import os
 
 import hydra
 import torch
+import torch.nn as nn
 from accelerate import Accelerator
 from accelerate.utils import set_seed
 from aim import Distribution
@@ -16,6 +17,7 @@ from constants import HEADS, OPTIMIZERS
 from datasets import VideoDataset
 from models import (
     MMCRTwoStageTwoHeadPredictor,
+    ProjectionHead,
     TwoStageTwoHeadPredictor,
     create_encoder,
 )
@@ -71,6 +73,9 @@ def train(cfg: OmegaConf):
         )
         if OmegaConf.select(cfg, "model.autoregressive_type")
         else None,
+        projector=ProjectionHead(**cfg.model.projection_kwargs)
+        if OmegaConf.select(cfg, "model.projection_kwargs")
+        else nn.Identity(),
         norm=OmegaConf.select(cfg, "cfg.model.norm"),
     )
 
@@ -81,7 +86,7 @@ def train(cfg: OmegaConf):
                 break
             param.requires_grad = False
 
-    model = model.to(accelerator.device)
+    # model = model.to(accelerator.device)
 
     # Load dataset
     train_dataset = VideoDataset(

@@ -16,3 +16,5 @@ autoregressive_kwargs:
   input_size: 2048
   hidden_size: 2048
   num_layers: 1
+
+projection_kwargs: null

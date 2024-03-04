@@ -9,6 +9,37 @@ from timm import create_model, list_models
 from torch.linalg import svdvals
 
 
+class ProjectionHead(nn.Module):
+    def __init__(self, in_features: int, hidden_features: List[int], out_features: int):
+        super().__init__()
+        layers = []
+        layers.append(nn.Linear(in_features, hidden_features[0]))
+        layers.append(nn.ReLU())
+        for i in range(len(hidden_features) - 1):
+            layers.append(nn.Linear(hidden_features[i], hidden_features[i + 1]))
+            layers.append(nn.ReLU())
+        layers.append(nn.Linear(hidden_features[-1], out_features))
+        self.model = nn.Sequential(*layers)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.model(x)
+
+
+class ProjectionHead(nn.Module):
+    def __init__(self, features: List[int]):
+        super().__init__()
+        layers = []
+        for i in range(len(features) - 1):
+            layers.append(nn.Linear(features[i], features[i + 1]))
+            layers.append(nn.ReLU())
+
+        # Don't include last ReLU
+        self.model = nn.Sequential(*layers[:-1])
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.model(x)
+
+
 def create_encoder(
     model_name: str,
     weights: os.PathLike = None,
@@ -121,6 +152,9 @@ class MMCRTwoStageTwoHeadPredictor(TwoStageTwoHeadPredictor):
     def calculate_loss(self, input: torch.Tensor, label: torch.Tensor) -> torch.Tensor:
         # encode the frames (treat each frame as a separate sample)
         latents = self.get_latent(input)
+        latents = torch.stack(
+            [self.projector(latent) for latent in latents.unbind(dim=0)]
+        )
 
         assert (
             latents.dim() == 3

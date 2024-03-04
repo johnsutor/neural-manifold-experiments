@@ -15,3 +15,5 @@ classification_kwargs:
 
 autoregresssive_type: null
 autoregresssive_kwargs: {}
+
+projection_kwargs: null
