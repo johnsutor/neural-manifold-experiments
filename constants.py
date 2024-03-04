@@ -1,6 +1,7 @@
 from functools import partial
 
 import torch
+from timm.optim import Lars
 from torchvision.transforms.v2 import (
     Compose,
     Lambda,
@@ -24,7 +25,7 @@ HEADS = {
     "flatten": torch.nn.Flatten,
 }
 
-OPTIMIZERS = {"adam": torch.optim.Adam, "sgd": torch.optim.SGD}
+OPTIMIZERS = {"adam": torch.optim.Adam, "sgd": torch.optim.SGD, "lars": Lars}
 
 SCHEDULERS = {
     "step": torch.optim.lr_scheduler.StepLR,
@@ -65,6 +66,13 @@ TRANSFORMS = {
             Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
         ]
     ),
+    "custom_moving_mnist": Compose(
+        [
+            ToDtype(torch.float32, scale=True),
+            Resize((64, 64), antialias=True),
+            Normalize(mean=[0.5], std=[0.5]),
+        ]
+    ),
 }
 
 TARGET_TRANSFORMS = {
@@ -72,4 +80,5 @@ TARGET_TRANSFORMS = {
     "moving_mnist": None,
     "kinetics": None,
     "physion": None,
+    "custom_moving_mnist": None,
 }

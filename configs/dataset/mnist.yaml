@@ -12,3 +12,4 @@ val_kwargs:
 
 val_name: "mnist"
 
+frames_per_clip: 7

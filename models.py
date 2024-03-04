@@ -1,10 +1,12 @@
 import os
-from typing import List, Optional, Tuple
+import warnings
+from typing import List, Literal, Optional
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from timm import create_model, list_models
+from torch.linalg import svdvals
 
 
 def create_encoder(
@@ -45,6 +47,7 @@ class TwoStageTwoHeadPredictor(nn.Module):
         linear_head: Optional[nn.Module],
         autoregressive_head: Optional[nn.Module],
         projector: nn.Module = nn.Identity(),
+        **kwargs,
     ):
         """
         Two-stage predictor model.
@@ -70,6 +73,12 @@ class TwoStageTwoHeadPredictor(nn.Module):
         self.autoregressive_head = autoregressive_head
         self.projector = projector
 
+        if "norm" in kwargs:
+            # Warn user they should use MMCR instead
+            warnings.warn(
+                "norm parameter not used in TwoStageTwoHeadPredictor. Use MMCRTwoStageTwoHead instead."
+            )
+
     def get_latent(self, x) -> List[torch.Tensor]:
         # input is shape (B, T, C, H, W)
         B, T, C, H, W = x.shape
@@ -80,7 +89,7 @@ class TwoStageTwoHeadPredictor(nn.Module):
 
     def calculate_loss(self, input: torch.Tensor, label: torch.Tensor) -> torch.Tensor:
         latents = self.get_latent(input)
-        B, T, C = latents.shape
+        B, T, *_ = latents.shape
 
         linear_loss = 0.0
         if self.linear_head is not None:
@@ -97,53 +106,36 @@ class TwoStageTwoHeadPredictor(nn.Module):
         return linear_loss + autoregressive_loss
 
 
-class TwoStagePredictor(nn.Module):
+class MMCRTwoStageTwoHeadPredictor(TwoStageTwoHeadPredictor):
     def __init__(
         self,
         encoder: nn.Module,
-        head: nn.Module,
+        linear_head: Optional[nn.Module],
+        autoregressive_head: Optional[nn.Module],
         projector: nn.Module = nn.Identity(),
+        norm: Literal[0, 1] = 0,
     ):
-        """
-        Two-stage predictor model.
-        Parameters
-        ----------
-        encoder : nn.Module
-            Encoder module. The encoder should have the method
-            forward_features() which returns the encoded image,
-            as opposed to forward which returns the linear outputs
-            (for compatibility with
-            [Torch Image Models](https://github.com/huggingface/pytorch-image-models))
-        head : nn.Module
-            Module for transforming encoded features.
-        projector : nn.Module, optional
-            Projector module. The default is nn.Identity().
+        super().__init__(encoder, None, autoregressive_head, projector)
+        self.norm = norm
 
-        """
-        super().__init__()
-        self.encoder = encoder
-        self.head = head
-        self.projector = projector
+    def calculate_loss(self, input: torch.Tensor, label: torch.Tensor) -> torch.Tensor:
+        # encode the frames (treat each frame as a separate sample)
+        latents = self.get_latent(input)
 
-    def get_latent(self, x) -> List[torch.Tensor]:
-        return self.encoder.forward(x)
+        assert (
+            latents.dim() == 3
+        ), f"Latent shape is not correct: shape is {latents.shape}"
 
-    def get_regressed(self, x, hidden) -> Tuple[torch.Tensor, torch.Tensor]:
-        latents = self.encoder.forward(x)
-        encoded_image = latents[-1].reshape(latents[-1].shape[0], -1)
-        if isinstance(self.head, nn.Linear):
-            latent, hidden = self.head(encoded_image), None
-        else:
-            latent, hidden = self.head(encoded_image, hidden)
-        return latent, hidden
+        latents = F.normalize(latents, p=2, dim=-1)
 
-    def get_decoded(self, latent) -> torch.Tensor:
-        return self.projector(latent)
+        centroid = latents.mean(dim=1)
 
-    def forward(
-        self, x, hidden=None
-    ) -> Tuple[List[torch.Tensor], torch.Tensor, torch.Tensor]:
-        latents = self.get_latent(x)
-        pred_latent, hidden = self.get_regressed(x, hidden)
-        pred_latent = self.get_decoded(pred_latent)
-        return latents, pred_latent, hidden
+        # SVD
+        S_c = svdvals(centroid)
+        S_l = svdvals(latents)
+
+        # TODO: Try softmax
+        if self.norm == 0:
+            S_c, S_l = S_c.tanh(), S_l.tanh()
+
+        return -S_c.sum() + S_l.sum() / latents.shape[0]

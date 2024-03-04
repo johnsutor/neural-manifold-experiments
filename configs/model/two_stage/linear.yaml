@@ -1,3 +1,4 @@
+type: default
 encoder:
   type: resnet18
   weights: null

@@ -22,8 +22,13 @@ return_nodes:
 - layer4.0.conv2
 - layer4.1.conv1
 - layer4.1.conv2
-dataset_kwargs:
+train_dataset_kwargs:
   root:  ${oc.env:EXPERIMENT_ROOT}/data
   train: true
   download: true
-dataset: "mnist"
+train_dataset: "mnist"
+val_dataset_kwargs:
+  root:  ${oc.env:EXPERIMENT_ROOT}/data
+  train: false
+  download: true
+val_dataset: "mnist"

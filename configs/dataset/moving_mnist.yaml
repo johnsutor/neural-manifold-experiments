@@ -11,3 +11,5 @@ val_kwargs:
   download: true
 
 val_name: "moving_mnist"
+
+frames_per_clip: 7

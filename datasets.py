@@ -11,8 +11,9 @@ from physion import PhysionAllDataset
 
 
 class CustomMovingMnistPyTorchDataset(Dataset):
-    def __init__(self, path: str, **kwargs):
+    def __init__(self, path: str, train: bool = True, **kwargs):
         self.path = path
+        self.train = train
         with h5py.File(self.path, "r") as hf:
             self.frames = hf["frames"][:]
             self.digits = hf["digits"][:]
@@ -26,14 +27,27 @@ class CustomMovingMnistPyTorchDataset(Dataset):
 
     def __getitem__(self, idx):
         """Returns the video frames, the digit, the angle, the x position, the y position, and the speed (in that order)"""
-        return (
-            self.frames[idx],
-            self.digits[idx],
-            self.angles[idx],
-            self.xs[idx],
-            self.ys[idx],
-            self.speeds[idx],
-        )
+
+        # Return first ten if train, last ten if test
+        if self.train:
+            return (
+                self.frames[idx][:10],
+                self.digits[idx][:10],
+                self.angles[idx][:10],
+                self.xs[idx][:10],
+                self.ys[idx][:10],
+                self.speeds[idx][:10],
+            )
+
+        else:
+            return (
+                self.frames[idx][10:],
+                self.digits[idx][10:],
+                self.angles[idx][10:],
+                self.xs[idx][10:],
+                self.ys[idx][10:],
+                self.speeds[idx][10:],
+            )
 
 
 class VideoDataset(Dataset):
@@ -106,7 +120,11 @@ class VideoDataset(Dataset):
         else:
             raise NotImplementedError(f"Dataset {self.name} not implemented")
 
-        if self.name not in ["mnist", "physion"]:
+        if self.name not in [
+            "mnist",
+            "physion",
+            "custom_moving_mnist",
+        ]:  # TODO: check custom moving mnist
             self._assert_stride_ok()
 
     def _assert_stride_ok(self):
@@ -138,16 +156,21 @@ class VideoDataset(Dataset):
 
         if self.name in ["moving_mnist", "kinetics"]:
             frames = self.data[idx]
+        elif self.name == "custom_moving_mnist":
+            frames, labels, angles, xs, ys, speeds = self.data[idx]
+            # TODO: this is a hack. Fix the generation of the dataset to
+            # pad the channels dimension with 1
+            frames = torch.from_numpy(frames).float().unsqueeze(1)
         else:
             frames, labels = self.data[idx]
 
         if self.transform:
             frames = self.transform(frames)
-            
+
         video_len = len(frames)
         frames_per_clip = self.frames_per_clip
 
-        assert video_len >= frames_per_clip, "videos are shorter than clip lengths-"
+        assert video_len >= frames_per_clip, "videos are shorter than clip lengths"
 
         if video_len > frames_per_clip:
             min_stride = max(self.stride_range[0], 1)

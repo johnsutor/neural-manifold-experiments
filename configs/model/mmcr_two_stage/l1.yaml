@@ -1,0 +1,17 @@
+type: mmcr
+encoder:
+  type: resnet18
+  weights: null
+  kwargs:
+    pretrained: false
+    in_chans: 1
+    num_classes: 0
+    global_pool: ''
+
+classification_type: null
+classification_kwargs: {}
+
+autoregressive_type: null
+autoregressive_kwargs: {}
+
+norm: 1

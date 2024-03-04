@@ -1,3 +1,4 @@
+type: default
 encoder:
   type: resnet18
   weights: null
@@ -7,10 +8,8 @@ encoder:
     num_classes: 0
     global_pool: ''
 
-classification_type: linear
-classification_kwargs: 
-  in_features: 2048
-  out_features: 10
+classification_type: null
+classification_kwargs: {}
 
 autoregressive_type: lstm
 autoregressive_kwargs:
