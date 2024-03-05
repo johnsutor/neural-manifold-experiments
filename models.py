@@ -111,11 +111,12 @@ class TwoStageTwoHeadPredictor(nn.Module):
             )
 
     def get_latent(self, x) -> List[torch.Tensor]:
-        # input is shape (B, T, C, H, W)
-        B, T, C, H, W = x.shape
-        x = x.reshape(B * T, C, H, W)
-        x = self.encoder.forward(x)
+        B, T, *_ = x.shape
+
+        x = [self.encoder(x[:, i, :, :, :]) for i in range(T)]
+        x = torch.stack(x, dim=1)
         x = x.reshape(B, T, -1)
+
         return x
 
     def calculate_loss(self, input: torch.Tensor, label: torch.Tensor) -> torch.Tensor:
