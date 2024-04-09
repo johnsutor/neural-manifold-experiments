@@ -1,7 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+
+import logging
 import os
+import sys
+from typing import Any
 
 import hydra
 import torch
@@ -9,21 +13,23 @@ import torch.nn as nn
 from accelerate import Accelerator
 from accelerate.utils import set_seed
 from aim import Distribution
-from omegaconf import OmegaConf
+from hydra.core.utils import JobReturn, JobStatus
+from hydra.experimental.callback import Callback
+from omegaconf import DictConfig, OmegaConf
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from constants import HEADS, OPTIMIZERS
-from datasets import VideoDataset
-from models import (
+from manifold_experiments.constants import HEADS, OPTIMIZERS
+from manifold_experiments.datasets import VideoDataset
+from manifold_experiments.manifold_models import (
     MMCRTwoStageTwoHeadPredictor,
     ProjectionHead,
     TwoStageTwoHeadPredictor,
     create_encoder,
 )
-from utils.flatten import flatten
-from utils.knn import manifold_knn
-from utils.manifold_statistics import (
+from manifold_experiments.utils.flatten import flatten
+from manifold_experiments.utils.knn import manifold_knn
+from manifold_experiments.utils.manifold_statistics import (
     extract_activations,
     get_feature_extractor,
     make_manifold_data,
@@ -31,9 +37,26 @@ from utils.manifold_statistics import (
 )
 
 
+class LogJobReturnCallback(Callback):
+    """Log the job's return value or error upon job end"""
+
+    def __init__(self) -> None:
+        self.log = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
+
+    def on_job_end(
+        self, config: DictConfig, job_return: JobReturn, **kwargs: Any
+    ) -> None:
+        if job_return.status == JobStatus.COMPLETED:
+            self.log.info(f"Succeeded with return value: {job_return.return_value}")
+        elif job_return.status == JobStatus.FAILED:
+            self.log.error("", exc_info=job_return._return_value)
+        else:
+            self.log.error("Status unknown. This should never happen.")
+
+
 @hydra.main(config_path="configs", config_name="train", version_base="1.1")
 def train(cfg: OmegaConf):
-    print(OmegaConf.to_yaml(cfg))
+    print(OmegaConf.to_yaml(cfg), flush=True)
     set_seed(cfg.seed)
 
     accelerator = Accelerator(
@@ -210,11 +233,21 @@ def train(cfg: OmegaConf):
             f"Epoch {epoch}: Train Loss {log_obj['train_loss']}, Val Loss {log_obj['val_loss']}"
         )
 
-    accelerator.save(model.state_dict(), "model.pth")
+    os.makedirs(str(hydra.core.hydra_config.HydraConfig.get().job.num), exist_ok=True)
+    accelerator.save(
+        model.state_dict(),
+        os.path.join(
+            hydra.core.hydra_config.HydraConfig.get().runtime.output_dir,
+            str(hydra.core.hydra_config.HydraConfig.get().job.num),
+            "model.pth",
+        ),
+    )
     torch.save(
         model.encoder.state_dict(),
         os.path.join(
-            hydra.core.hydra_config.HydraConfig.get().runtime.output_dir, "encoder.pth"
+            hydra.core.hydra_config.HydraConfig.get().runtime.output_dir,
+            str(hydra.core.hydra_config.HydraConfig.get().job.num),
+            "encoder.pth",
         ),
     )
 

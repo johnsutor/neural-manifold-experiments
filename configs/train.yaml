@@ -24,3 +24,7 @@ hydra:
   sweep:
     dir: ${oc.env:EXPERIMENT_ROOT}/multirun
     subdir: ${experiment_name}
+  callbacks:
+    log_job_return_callback:
+      _target_: train.LogJobReturnCallback
+      

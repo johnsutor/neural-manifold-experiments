@@ -10,6 +10,10 @@ Then, make sure to set your experiment root directory like so
 ```shell
 $ export EXPERIMENT_ROOT=<YOUR EXPERIMENT ROOT DIRECTORY>
 ```
+Next, make sure to install the package to enable running it on SLURM
+```shell
+$ pip install -e . 
+```
 Finally, use 
 ```shell
 $ python train.py

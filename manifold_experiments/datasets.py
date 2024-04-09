@@ -6,8 +6,8 @@ import torch
 from torch.utils.data import Dataset
 from torchvision.datasets import MNIST, Kinetics, MovingMNIST
 
-from constants import TARGET_TRANSFORMS, TRANSFORMS
-from physion import PhysionAllDataset
+from manifold_experiments.constants import TARGET_TRANSFORMS, TRANSFORMS
+from manifold_experiments.physion import PhysionAllDataset
 
 
 class CustomMovingMnistPyTorchDataset(Dataset):
