@@ -32,13 +32,11 @@ def manifold_knn(
     batch_size : int, optional
         Batch size for the dataloader, by default 128
     num_workers : int, optional
-        Number of workers for the dataloader, by default 4
+        Number of workers for the dataloader, by default 2
 
     Returns:
-    float
-        Top-1 accuracy
-    float
-        Top-5 accuracy
+    dict
+        Dictionary containing top-1 and top-5 accuracy
     """
     top1, top5, total = 0.0, 0.0, 0
 

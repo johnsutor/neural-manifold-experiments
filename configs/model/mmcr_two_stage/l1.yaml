@@ -17,3 +17,4 @@ autoregressive_kwargs: {}
 projection_kwargs: null
 
 norm: 1
+manifold_loss: "capacity"

@@ -1,7 +1,7 @@
 defaults:
   - _self_
   - dataset: moving_mnist
-  - manifold: ellipsoid_and_knn
+  - manifold: default
   - model: two_stage/linear
   - optimizer: adam
 

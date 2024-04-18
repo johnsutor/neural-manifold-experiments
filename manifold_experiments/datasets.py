@@ -158,8 +158,6 @@ class VideoDataset(Dataset):
             frames = self.data[idx]
         elif self.name == "custom_moving_mnist":
             frames, labels, angles, xs, ys, speeds = self.data[idx]
-            # TODO: this is a hack. Fix the generation of the dataset to
-            # pad the channels dimension with 1
             frames = torch.from_numpy(frames).float().unsqueeze(1)
         else:
             frames, labels = self.data[idx]

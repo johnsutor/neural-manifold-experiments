@@ -18,4 +18,5 @@ Finally, use
 ```shell
 $ python train.py
 ```
-passing any overrides based on the above link to Hydra.
+passing any overrides based on the above link to Hydra. To use with the submitit launcher, please 
+reference the instructions [here](https://hydra.cc/docs/1.3/plugins/submitit_launcher/)

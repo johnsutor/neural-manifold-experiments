@@ -1,6 +1,7 @@
 calculate:
   - ellipsoid
   - knn
+  - lstsq
 calculate_every: 10
 sampled_classes: 10
 examples_per_class: 128

@@ -10,22 +10,6 @@ from torch.linalg import svdvals
 
 
 class ProjectionHead(nn.Module):
-    def __init__(self, in_features: int, hidden_features: List[int], out_features: int):
-        super().__init__()
-        layers = []
-        layers.append(nn.Linear(in_features, hidden_features[0]))
-        layers.append(nn.ReLU())
-        for i in range(len(hidden_features) - 1):
-            layers.append(nn.Linear(hidden_features[i], hidden_features[i + 1]))
-            layers.append(nn.ReLU())
-        layers.append(nn.Linear(hidden_features[-1], out_features))
-        self.model = nn.Sequential(*layers)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.model(x)
-
-
-class ProjectionHead(nn.Module):
     def __init__(self, features: List[int]):
         super().__init__()
         layers = []
@@ -146,9 +130,11 @@ class MMCRTwoStageTwoHeadPredictor(TwoStageTwoHeadPredictor):
         autoregressive_head: Optional[nn.Module],
         projector: nn.Module = nn.Identity(),
         norm: Literal[0, 1] = 0,
+        manifold_loss: Literal["capacity", "radius", "dimensionality"] = "capacity",
     ):
         super().__init__(encoder, None, autoregressive_head, projector)
         self.norm = norm
+        self.manifold_loss = manifold_loss
 
     def calculate_loss(self, input: torch.Tensor, label: torch.Tensor) -> torch.Tensor:
         # encode the frames (treat each frame as a separate sample)
@@ -167,10 +153,20 @@ class MMCRTwoStageTwoHeadPredictor(TwoStageTwoHeadPredictor):
 
         # SVD
         S_c = svdvals(centroid)
-        S_l = svdvals(latents)
 
-        # TODO: Try softmax
         if self.norm == 0:
-            S_c, S_l = S_c.tanh(), S_l.tanh()
+            S_c = S_c.tanh()
 
-        return -S_c.sum() + S_l.sum() / latents.shape[0]
+        # Original from MMCR Paper: -S_c.sum() + lambda *  S_l.sum() / latents.shape[0]
+        # However, implicit manifold compression actually reduces the mean augmentation
+        # manifold nuclear norm, so the S_l term isn't necessary. Although radius is
+        # (S_c ** 2).sum() ** 0.5, mean is consistent across batch sizes, and we can
+        # remove 0.5 because of the monotonicity of the square root function.
+
+        # Default case: use the capacity as loss
+        if self.manifold_loss == "capacity":
+            return -S_c.mean()
+        elif self.manifold_loss == "radius":
+            return -(S_c**2).mean()
+        else:
+            return -(abs(S_c).mean() ** 2) / (S_c**2).mean()

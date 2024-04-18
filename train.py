@@ -4,7 +4,6 @@
 
 import logging
 import os
-import sys
 from typing import Any
 
 import hydra
@@ -29,6 +28,7 @@ from manifold_experiments.manifold_models import (
 )
 from manifold_experiments.utils.flatten import flatten
 from manifold_experiments.utils.knn import manifold_knn
+from manifold_experiments.utils.least_square_regression import manifold_lstsq
 from manifold_experiments.utils.manifold_statistics import (
     extract_activations,
     get_feature_extractor,
@@ -100,6 +100,9 @@ def train(cfg: OmegaConf):
         if OmegaConf.select(cfg, "model.projection_kwargs")
         else nn.Identity(),
         norm=OmegaConf.select(cfg, "cfg.model.norm"),
+        manifold_loss=OmegaConf.select(
+            cfg, "cfg.model.manifold_loss", default="capacity"
+        ),
     )
 
     # Freeze layers up until the specified layer, if present
@@ -182,6 +185,12 @@ def train(cfg: OmegaConf):
                         manifold_val_dataset,
                     )
                     manifold_statistics.update(knn_results)
+
+                # NOTE: This is only meaningful when performed on video datasets,
+                # not on MNIST
+                if "lstsq" in cfg.manifold.calculate:
+                    lstsq_results = manifold_lstsq(model, val_dataset)
+                    manifold_statistics.update(lstsq_results)
 
                 analysis = manifold_analysis(activations, cfg.manifold.calculate)
                 manifold_statistics.update(analysis)
