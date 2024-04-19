@@ -17,3 +17,5 @@ autoregresssive_type: null
 autoregresssive_kwargs: {}
 
 projection_kwargs: null
+
+name: linear

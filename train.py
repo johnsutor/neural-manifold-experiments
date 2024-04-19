@@ -11,12 +11,12 @@ import torch
 import torch.nn as nn
 from accelerate import Accelerator
 from accelerate.utils import set_seed
-from aim import Distribution
 from hydra.core.utils import JobReturn, JobStatus
 from hydra.experimental.callback import Callback
 from omegaconf import DictConfig, OmegaConf
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+from wandb import Histogram
 
 from manifold_experiments.constants import HEADS, OPTIMIZERS
 from manifold_experiments.datasets import VideoDataset
@@ -61,15 +61,18 @@ def train(cfg: OmegaConf):
 
     accelerator = Accelerator(
         cpu=cfg.cpu,
-        log_with="aim",
+        log_with="wandb",
         project_dir=hydra.core.hydra_config.HydraConfig.get().runtime.output_dir,
         mixed_precision=cfg.mixed_precision,
     )
 
+    run_name = f"{cfg.model.name}_loss_{cfg.model.manifold_loss}"
+    run_name += f"_lr_{cfg.learning_rate}_batch_{cfg.batch_size}_seed_{cfg.seed}"
+
     accelerator.init_trackers(
         project_name=cfg.experiment_name,
         config=OmegaConf.to_container(cfg, enum_to_str=True),
-        init_kwargs={},
+        init_kwargs={"wandb": {"name": run_name}},
     )
 
     encoder = create_encoder(
@@ -233,10 +236,13 @@ def train(cfg: OmegaConf):
         )
 
         for key, value in log_obj.items():
-            if "singular_values" in key and value is not None:
-                accelerator.get_tracker("aim").tracker.track(
-                    Distribution(value), name=key, epoch=epoch
-                )
+            try:
+                if "singular_values" in key and value is not None:
+                    accelerator.get_tracker("aim").tracker.log_artifact(
+                        Histogram(value), name=key, epoch=epoch
+                    )
+            except Exception:
+                pass
 
         accelerator.print(
             f"Epoch {epoch}: Train Loss {log_obj['train_loss']}, Val Loss {log_obj['val_loss']}"
@@ -259,6 +265,7 @@ def train(cfg: OmegaConf):
             "encoder.pth",
         ),
     )
+    accelerator.end_training()
 
 
 if __name__ == "__main__":

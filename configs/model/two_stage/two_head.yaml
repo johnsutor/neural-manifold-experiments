@@ -20,3 +20,5 @@ autoregressive_kwargs:
   num_layers: 1
 
 projection_kwargs: null
+
+name: two_head

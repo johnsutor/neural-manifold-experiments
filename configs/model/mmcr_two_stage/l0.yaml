@@ -18,3 +18,5 @@ projection_kwargs: null
 
 norm: 0
 manifold_loss: "capacity"
+
+name: mmcr_l0
