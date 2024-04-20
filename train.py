@@ -12,6 +12,7 @@ import torch.nn as nn
 from accelerate import Accelerator
 from accelerate.utils import set_seed
 from hydra.core.utils import JobReturn, JobStatus
+from hydra.core.hydra_config import HydraConfig
 from hydra.experimental.callback import Callback
 from omegaconf import DictConfig, OmegaConf
 from torch.utils.data import DataLoader
@@ -62,11 +63,11 @@ def train(cfg: OmegaConf):
     accelerator = Accelerator(
         cpu=cfg.cpu,
         log_with="wandb",
-        project_dir=hydra.core.hydra_config.HydraConfig.get().runtime.output_dir,
+        project_dir=HydraConfig.get().runtime.output_dir,
         mixed_precision=cfg.mixed_precision,
     )
 
-    run_name = f"{cfg.model.name}_loss_{cfg.model.manifold_loss}"
+    run_name = f"{cfg.model.name}_{cfg.dataset.train_name}_loss_{cfg.model.manifold_loss}"
     run_name += f"_lr_{cfg.learning_rate}_batch_{cfg.batch_size}_seed_{cfg.seed}"
 
     accelerator.init_trackers(
@@ -89,23 +90,22 @@ def train(cfg: OmegaConf):
 
     model = model_type(
         encoder=encoder,
-        linear_head=HEADS[cfg.model.classification_type](
-            **cfg.model.classification_kwargs
-        )
+
+        linear_head=HEADS[cfg.model.classification_type](**cfg.model.classification_kwargs)
         if OmegaConf.select(cfg, "model.classification_type")
         else None,
-        autoregressive_head=HEADS[cfg.model.autoregressive_type](
-            **cfg.model.autoregressive_kwargs
-        )
+
+        autoregressive_head=HEADS[cfg.model.autoregressive_type](**cfg.model.autoregressive_kwargs)
         if OmegaConf.select(cfg, "model.autoregressive_type")
         else None,
+
         projector=ProjectionHead(**cfg.model.projection_kwargs)
         if OmegaConf.select(cfg, "model.projection_kwargs")
         else nn.Identity(),
+
         norm=OmegaConf.select(cfg, "cfg.model.norm"),
-        manifold_loss=OmegaConf.select(
-            cfg, "cfg.model.manifold_loss", default="capacity"
-        ),
+
+        manifold_loss=OmegaConf.select(cfg, "cfg.model.manifold_loss", default="capacity"),
     )
 
     # Freeze layers up until the specified layer, if present
@@ -248,20 +248,20 @@ def train(cfg: OmegaConf):
             f"Epoch {epoch}: Train Loss {log_obj['train_loss']}, Val Loss {log_obj['val_loss']}"
         )
 
-    os.makedirs(str(hydra.core.hydra_config.HydraConfig.get().job.num), exist_ok=True)
+    os.makedirs(str(HydraConfig.get().job.num), exist_ok=True)
     accelerator.save(
         model.state_dict(),
         os.path.join(
-            hydra.core.hydra_config.HydraConfig.get().runtime.output_dir,
-            str(hydra.core.hydra_config.HydraConfig.get().job.num),
+            HydraConfig.get().runtime.output_dir,
+            str(HydraConfig.get().job.num),
             "model.pth",
         ),
     )
     torch.save(
         model.encoder.state_dict(),
         os.path.join(
-            hydra.core.hydra_config.HydraConfig.get().runtime.output_dir,
-            str(hydra.core.hydra_config.HydraConfig.get().job.num),
+            HydraConfig.get().runtime.output_dir,
+            str(HydraConfig.get().job.num),
             "encoder.pth",
         ),
     )
