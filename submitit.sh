@@ -41,6 +41,7 @@ module list
 python /mnt/home/acanatar/jupyter/neural-manifold-experiments/train.py \
     --multirun dataset=moving_mnist \
     hydra/launcher=submitit_slurm \
+    hydra.launcher.timeout_min=120 \
     hydra.launcher.nodes=1 \
     hydra.launcher.mem_gb=64 \
     hydra.launcher.gpus_per_node=1 \
