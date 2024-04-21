@@ -1,0 +1,31 @@
+defaults:
+  - _self_
+  - dataset: moving_mnist
+  - manifold: default
+  - model: mmcr_two_stage/l1
+   manifold_loss: "capacity"
+  - optimizer: lars
+
+experiment_name: ${now:%Y-%m-%d_%H-%M-%S}
+seed: 42
+cpu: false
+mixed_precision: 'no'
+learning_rate: 1
+epochs: 51 # One extra epoch for the final evaluation
+
+# Dataloader 
+shuffle: true
+num_workers: 4
+pin_memory: true
+batch_size: 64
+
+hydra:
+  run:
+    dir: ${oc.env:EXPERIMENT_ROOT}/${hydra.job.name}/${experiment_name}
+  sweep:
+    dir: ${oc.env:EXPERIMENT_ROOT}/multirun
+    subdir: ${experiment_name}
+  callbacks:
+    log_job_return_callback:
+      _target_: train.LogJobReturnCallback
+      

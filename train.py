@@ -55,7 +55,7 @@ class LogJobReturnCallback(Callback):
             self.log.error("Status unknown. This should never happen.")
 
 
-@hydra.main(config_path="configs", config_name="train", version_base="1.1")
+@hydra.main(config_path="configs", config_name="mmcr_train", version_base="1.1")
 def train(cfg: OmegaConf):
     print(OmegaConf.to_yaml(cfg), flush=True)
     set_seed(cfg.seed)
@@ -103,9 +103,9 @@ def train(cfg: OmegaConf):
         if OmegaConf.select(cfg, "model.projection_kwargs")
         else nn.Identity(),
 
-        norm=OmegaConf.select(cfg, "cfg.model.norm"),
+        norm=OmegaConf.select(cfg, "model.norm"),
 
-        manifold_loss=OmegaConf.select(cfg, "cfg.model.manifold_loss", default="capacity"),
+        manifold_loss=OmegaConf.select(cfg, "model.manifold_loss", default="capacity"),
     )
 
     # Freeze layers up until the specified layer, if present

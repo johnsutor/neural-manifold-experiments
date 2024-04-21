@@ -40,7 +40,7 @@ module load modules slurm cuda/12.1.1 cudnn/8.9.2.26 nccl gmp mpfr ffmpeg gcc ll
 module list
 
 ## Create a gpu node: -t <DD-HH:MM:SS>
-srun -p gpu -C "a100,ib" --gpus=1 --mem=32G -c 4 -t 1-23:59:00 \
+srun -p gpu -C "v100" --gpus=1 --mem=32G -c 4 -t 1-23:59:00 \
     /mnt/home/acanatar/jupyter/neural-manifold-experiments/train.py \
     experiment_name=TESTING_LSTSQ_AGAIN_BRO \
     model=mmcr_two_stage/l1 \
