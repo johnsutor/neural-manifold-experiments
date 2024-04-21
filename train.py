@@ -17,7 +17,7 @@ from hydra.experimental.callback import Callback
 from omegaconf import DictConfig, OmegaConf
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-from wandb import Histogram
+# from wandb import Histogram
 
 from manifold_experiments.constants import HEADS, OPTIMIZERS
 from manifold_experiments.datasets import VideoDataset
