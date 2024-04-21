@@ -235,14 +235,14 @@ def train(cfg: OmegaConf):
             step=epoch,
         )
 
-        for key, value in log_obj.items():
-            try:
-                if "singular_values" in key and value is not None:
-                    accelerator.get_tracker("aim").tracker.log_artifact(
-                        Histogram(value), name=key, epoch=epoch
-                    )
-            except Exception:
-                pass
+        # for key, value in log_obj.items():
+        #     try:
+        #         if "singular_values" in key and value is not None:
+        #             accelerator.get_tracker("aim").tracker.log_artifact(
+        #                 Histogram(value), name=key, epoch=epoch
+        #             )
+        #     except Exception:
+        #         pass
 
         accelerator.print(
             f"Epoch {epoch}: Train Loss {log_obj['train_loss']}, Val Loss {log_obj['val_loss']}"
