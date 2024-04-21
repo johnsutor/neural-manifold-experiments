@@ -19,10 +19,9 @@ export HF_HOME="/mnt/ceph/users/acanatar/huggingface"
 export PROJECT_DIR="/mnt/ceph/users/acanatar/foundations"
 export NEURAL_FOUNDATIONS_SRC="/mnt/home/acanatar/neural-foundations/src"
 export ANACONDA_PATH=/mnt/home/acanatar/anaconda3/bin/activate
-export EXPERIMENT_ROOT=/mnt/home/acanatar/ceph/manifold-experiments
 export TORCH_HOME=/mnt/home/acanatar/ceph/.torch
 
-
+export EXPERIMENT_ROOT=/mnt/home/acanatar/ceph/manifold-experiments
 export WANDB_API_KEY=101e8cacc42cb22ed02071571fb2017ddd6c5ade
 
 ## Activate the environment

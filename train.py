@@ -55,7 +55,7 @@ class LogJobReturnCallback(Callback):
             self.log.error("Status unknown. This should never happen.")
 
 
-@hydra.main(config_path="configs", config_name="train", version_base="1.1")
+@hydra.main(config_path="configs", config_name="mmcr_train", version_base="1.1")
 def train(cfg: OmegaConf):
     print(OmegaConf.to_yaml(cfg), flush=True)
     set_seed(cfg.seed)
