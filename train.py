@@ -69,7 +69,11 @@ def train(cfg: OmegaConf):
     accelerator.init_trackers(
         project_name=cfg.experiment_name,
         config=OmegaConf.to_container(cfg, enum_to_str=True),
-        init_kwargs={},
+        init_kwargs={
+            "wandb": {
+                "name": hydra.core.hydra_config.HydraConfig.get().job.override_dirname
+            }
+        },
     )
 
     encoder = create_encoder(
@@ -99,10 +103,8 @@ def train(cfg: OmegaConf):
         projector=ProjectionHead(**cfg.model.projection_kwargs)
         if OmegaConf.select(cfg, "model.projection_kwargs")
         else nn.Identity(),
-        norm=OmegaConf.select(cfg, "cfg.model.norm"),
-        manifold_loss=OmegaConf.select(
-            cfg, "cfg.model.manifold_loss", default="capacity"
-        ),
+        norm=OmegaConf.select(cfg, "model.norm"),
+        manifold_loss=OmegaConf.select(cfg, "model.manifold_loss", default="capacity"),
     )
 
     # Freeze layers up until the specified layer, if present
