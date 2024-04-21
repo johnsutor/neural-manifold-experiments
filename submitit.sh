@@ -43,7 +43,7 @@ python /mnt/home/acanatar/jupyter/neural-manifold-experiments/train.py \
     hydra/launcher=submitit_slurm \
     hydra.launcher.timeout_min=120 \
     hydra.launcher.nodes=1 \
-    hydra.launcher.mem_gb=64 \
+    hydra.launcher.mem_gb=32 \
     hydra.launcher.gpus_per_node=1 \
     hydra.launcher.constraint='"a100,ib"' \
     +hydra.launcher.gpus_per_task=1 \
@@ -55,7 +55,7 @@ python /mnt/home/acanatar/jupyter/neural-manifold-experiments/train.py \
     model=mmcr_two_stage/l1 \
     model.manifold_loss="capacity","radius","dimensionality" \
     optimizer=lars \
-    learning_rate=0.5,1,2 \
+    learning_rate=4,2,1 \
     batch_size=2048 \
     dataset.frames_per_clip=6 \
     +model.projection_kwargs.features=[2048,512,128] \

@@ -3,7 +3,6 @@ defaults:
   - dataset: moving_mnist
   - manifold: default
   - model: mmcr_two_stage/l1
-   manifold_loss: "capacity"
   - optimizer: lars
 
 experiment_name: ${now:%Y-%m-%d_%H-%M-%S}
