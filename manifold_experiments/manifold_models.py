@@ -2,9 +2,11 @@ import os
 import warnings
 from typing import List, Literal, Optional
 
+import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
 from timm import create_model, list_models
 from torch.linalg import svdvals
 
@@ -103,6 +105,15 @@ class TwoStageTwoHeadPredictor(nn.Module):
 
         return x
 
+    def get_projection(self, x: torch.Tensor) -> torch.Tensor:
+
+        latents = self.get_latent(x)
+        latents = torch.stack(
+            [self.projector(latent) for latent in latents.unbind(dim=0)]
+        )
+
+        return latents
+
     def calculate_loss(self, input: torch.Tensor, label: torch.Tensor) -> torch.Tensor:
         latents = self.get_latent(input)
         B, T, *_ = latents.shape
@@ -138,35 +149,44 @@ class MMCRTwoStageTwoHeadPredictor(TwoStageTwoHeadPredictor):
 
     def calculate_loss(self, input: torch.Tensor, label: torch.Tensor) -> torch.Tensor:
         # encode the frames (treat each frame as a separate sample)
-        latents = self.get_latent(input)
-        latents = torch.stack(
-            [self.projector(latent) for latent in latents.unbind(dim=0)]
-        )
+        latents = self.get_projection(input)
 
-        assert (
-            latents.dim() == 3
-        ), f"Latent shape is not correct: shape is {latents.shape}"
+        assert latents.dim() == 3, \
+            f"Latents must have shape (batch, frame, features): shape is {latents.shape}"
 
         latents = F.normalize(latents, p=2, dim=-1)
-
         centroid = latents.mean(dim=1)
 
-        # SVD
+        # SVD of centroids - shape (min(batch, feature))
         S_c = svdvals(centroid)
+        # SVD of latents - shape (batch, min(frame, feature))
+        S_z = svdvals(latents)
 
         if self.norm == 0:
             S_c = S_c.tanh()
+            S_z = S_z.tanh()
+
+        S_c = S_c.abs() / math.sqrt(max(centroid.shape))
+        S_z = S_z.abs() / math.sqrt(max(latents.shape[1:]))
 
         # Original from MMCR Paper: -S_c.sum() + lambda *  S_l.sum() / latents.shape[0]
         # However, implicit manifold compression actually reduces the mean augmentation
-        # manifold nuclear norm, so the S_l term isn't necessary. Although radius is
-        # (S_c ** 2).sum() ** 0.5, mean is consistent across batch sizes, and we can
-        # remove 0.5 because of the monotonicity of the square root function.
+        # manifold nuclear norm, so the S_l term isn't necessary.
 
-        # Default case: use the capacity as loss
-        if self.manifold_loss == "capacity":
-            return -S_c.mean()
-        elif self.manifold_loss == "radius":
-            return -(S_c**2).mean()
-        else:
-            return -(abs(S_c).mean() ** 2) / (S_c**2).mean()
+        rad_c = (S_c**2).sum().sqrt()
+        dim_c = S_c.sum()**2 / rad_c**2 / S_c.shape[-1]
+        alpha_c = rad_c * dim_c.sqrt()
+
+        rad_z = (S_z**2).sum(-1).sqrt()
+        dim_z = S_z.sum(-1)**2 / (S_z**2).sum(-1) / S_z.shape[-1]
+        alpha_z = rad_z * dim_z.sqrt()
+
+        losses = dict(capacity=-alpha_c,
+                      radius=-rad_c,
+                      dimensionality=-dim_c,
+                      capacity_obj=alpha_z.mean(),
+                      radius_obj=rad_z.mean(),
+                      dimensionality_obj=dim_z.mean()
+                      )
+
+        return losses

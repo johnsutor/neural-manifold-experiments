@@ -5,6 +5,7 @@
 import logging
 import os
 from typing import Any
+import numpy as np
 
 import hydra
 import torch
@@ -203,24 +204,35 @@ def train(cfg: OmegaConf):
         model.train()
         for data, label in tqdm(train_dataloader, desc=f"Train Epoch {epoch}"):
             optimizer.zero_grad(set_to_none=True)
-            loss = model.calculate_loss(data, label)
+            losses = model.calculate_loss(data, label)
+            assert type(losses) is dict, "Losses must be returned in a dictionary"
+
+            loss = losses[model.manifold_loss]
             accelerator.backward(loss)
             optimizer.step()
             train_loss += loss.item()
 
         # Validation
-        val_loss = 0
+        val_losses = dict()
         model.eval()
         with torch.no_grad():
             for data, label in tqdm(val_dataloader, desc=f"Val Epoch {epoch}"):
-                loss = model.calculate_loss(data, label)
-                val_loss += loss.item()
+                losses = model.calculate_loss(data, label)
+                assert type(losses) is dict, "Losses must be returned in a dictionary"
+                if len(val_losses) == 0:
+                    for key, val in losses.items():
+                        val_losses[key] = [val.item()]
+                else:
+                    for key, val in losses.items():
+                        val_losses[key] += [val.item()]
+        val_losses = {key: np.mean(val) for key, val in val_losses.items()}
 
         # Log to tensorboard
         log_obj = {
             "train_loss": train_loss / len(train_dataloader),
-            "val_loss": val_loss / len(val_dataloader),
+            "val_loss": val_losses[model.manifold_loss],
             "epoch": epoch,
+            **val_losses,
             **manifold_statistics,
         }
 

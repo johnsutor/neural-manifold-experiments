@@ -2,6 +2,8 @@
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+
 from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 
@@ -44,13 +46,17 @@ def manifold_lstsq(
         ranks = torch.tensor([])
         for data, _ in tqdm(manifold_val_dataloader, desc="Manifold Val LSTSQ"):
             data = data.to(device)
-            acts = module.get_latent(data)
+
+            # acts shape from (batch_size, frames, features) to (batch_size, features, frames)
+            acts = module.get_latent(data).permute(0, 2, 1).type(torch.DoubleTensor)
+            acts = F.normalize(acts, p=2, dim=1)
 
             # Activations of shape (1, frames, features)
             # Compute the least squares regression coefficients
-            X, y = acts[:, :-1, :].permute(0, 2, 1), acts[:, -1:, :].permute(0, 2, 1)
+            X, y = acts[:, :, :-1], acts[:, :, -1].unsqueeze(2)
             coef, residuals, rank, s = torch.linalg.lstsq(X, y, rcond=None)
             y_pred = torch.bmm(X, coef)
+
             total_sum_of_squares = torch.sum(
                 (y - y.mean(dim=(1), keepdim=True)) ** 2, dim=1
             )
