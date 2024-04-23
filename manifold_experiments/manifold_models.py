@@ -175,24 +175,24 @@ class MMCRTwoStageTwoHeadPredictor(TwoStageTwoHeadPredictor):
         # manifold nuclear norm, so the S_l term isn't necessary.
 
         # Get Radius, Dimension and Capacity from Singular Values
-        def get_rad_dim_capacity(S):
+        # def get_rad_dim_capacity(S):
 
-            rad = (S**2).sum().sqrt()
-            dim = S.sum()**2 / rad**2 / S.shape[-1]
-            alpha = rad * dim.sqrt()
+        #     rad = (S**2).sum().sqrt()
+        #     dim = S.sum()**2 / rad**2 / S.shape[-1]
+        #     alpha = rad * dim.sqrt()
 
-            return rad, dim, alpha
+        #     return rad, dim, alpha
 
-        rad_c, dim_c, alpha_c = get_rad_dim_capacity(S_c)
-        rad_z, dim_z, alpha_z = get_rad_dim_capacity(S_z)
+        # rad_c, dim_c, alpha_c = get_rad_dim_capacity(S_c)
+        # rad_z, dim_z, alpha_z = get_rad_dim_capacity(S_z)
 
-        # rad_c = (S_c**2).sum().sqrt()
-        # dim_c = S_c.sum()**2 / rad_c**2 / S_c.shape[-1]
-        # alpha_c = rad_c * dim_c.sqrt()
+        rad_c = (S_c**2).sum().sqrt()
+        dim_c = S_c.sum()**2 / rad_c**2 / S_c.shape[-1]
+        alpha_c = rad_c * dim_c.sqrt()
 
-        # rad_z = (S_z**2).sum(-1).sqrt()
-        # dim_z = S_z.sum(-1)**2 / (S_z**2).sum(-1) / S_z.shape[-1]
-        # alpha_z = rad_z * dim_z.sqrt()
+        rad_z = (S_z**2).sum(-1).sqrt()
+        dim_z = S_z.sum(-1)**2 / (S_z**2).sum(-1) / S_z.shape[-1]
+        alpha_z = rad_z * dim_z.sqrt()
 
         losses = dict(capacity=-alpha_c,
                       radius=-rad_c,
