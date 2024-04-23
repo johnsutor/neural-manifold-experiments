@@ -174,14 +174,19 @@ def train(cfg: OmegaConf):
     for epoch in range(cfg.epochs):
         # Analyze manifold
         if epoch % cfg.manifold.calculate_every == 0:
+
+            manifold_statistics = {}
             with torch.no_grad():
-                manifold_statistics = {}
-                feature_extractor = get_feature_extractor(
-                    model.encoder, cfg.manifold.return_nodes
-                )
-                activations = extract_activations(
-                    sampled_manifold_dataset, feature_extractor
-                )
+                if "ellipsoid" in cfg.manifold.calculate:
+                    feature_extractor = get_feature_extractor(
+                        model.encoder, cfg.manifold.return_nodes
+                    )
+                    activations = extract_activations(
+                        sampled_manifold_dataset, feature_extractor
+                    )
+                    analysis = manifold_analysis(activations, cfg.manifold.calculate)
+                    manifold_statistics.update(analysis)
+
                 if "knn" in cfg.manifold.calculate:
                     knn_results = manifold_knn(
                         model,
@@ -195,9 +200,6 @@ def train(cfg: OmegaConf):
                 if "lstsq" in cfg.manifold.calculate:
                     lstsq_results = manifold_lstsq(model, val_dataset)
                     manifold_statistics.update(lstsq_results)
-
-                analysis = manifold_analysis(activations, cfg.manifold.calculate)
-                manifold_statistics.update(analysis)
 
         # Train
         train_loss = 0

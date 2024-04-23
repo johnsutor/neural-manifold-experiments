@@ -118,7 +118,7 @@ def extract_activations(dataset: List[torch.tensor], module: nn.Module):
 
     Args:
         data: Iterable containing manifold input data
-        module: PyTorch module to compute the statistics for 
+        module: PyTorch module to compute the statistics for
         (must be a feature extractor that returns a dictionary of layer activations, i.e. {'layer_name': activations})
 
     Returns:

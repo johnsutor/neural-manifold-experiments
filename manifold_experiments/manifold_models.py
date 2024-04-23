@@ -141,7 +141,8 @@ class MMCRTwoStageTwoHeadPredictor(TwoStageTwoHeadPredictor):
         autoregressive_head: Optional[nn.Module],
         projector: nn.Module = nn.Identity(),
         norm: Literal[0, 1] = 0,
-        manifold_loss: Literal["capacity", "radius", "dimensionality"] = "capacity",
+        manifold_loss: Literal["capacity", "radius", "dimensionality",
+                               "capacity_obj", "radius_obj", "dimensionality_obj"] = "capacity",
     ):
         super().__init__(encoder, None, autoregressive_head, projector)
         self.norm = norm
@@ -173,13 +174,25 @@ class MMCRTwoStageTwoHeadPredictor(TwoStageTwoHeadPredictor):
         # However, implicit manifold compression actually reduces the mean augmentation
         # manifold nuclear norm, so the S_l term isn't necessary.
 
-        rad_c = (S_c**2).sum().sqrt()
-        dim_c = S_c.sum()**2 / rad_c**2 / S_c.shape[-1]
-        alpha_c = rad_c * dim_c.sqrt()
+        # Get Radius, Dimension and Capacity from Singular Values
+        def get_rad_dim_capacity(S):
 
-        rad_z = (S_z**2).sum(-1).sqrt()
-        dim_z = S_z.sum(-1)**2 / (S_z**2).sum(-1) / S_z.shape[-1]
-        alpha_z = rad_z * dim_z.sqrt()
+            rad = (S**2).sum().sqrt()
+            dim = S.sum()**2 / rad**2 / S.shape[-1]
+            alpha = rad * dim.sqrt()
+
+            return rad, dim, alpha
+
+        rad_c, dim_c, alpha_c = get_rad_dim_capacity(S_c)
+        rad_z, dim_z, alpha_z = get_rad_dim_capacity(S_z)
+
+        # rad_c = (S_c**2).sum().sqrt()
+        # dim_c = S_c.sum()**2 / rad_c**2 / S_c.shape[-1]
+        # alpha_c = rad_c * dim_c.sqrt()
+
+        # rad_z = (S_z**2).sum(-1).sqrt()
+        # dim_z = S_z.sum(-1)**2 / (S_z**2).sum(-1) / S_z.shape[-1]
+        # alpha_z = rad_z * dim_z.sqrt()
 
         losses = dict(capacity=-alpha_c,
                       radius=-rad_c,
