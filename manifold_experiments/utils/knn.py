@@ -90,8 +90,8 @@ def manifold_knn(
     retrieval_one_hot = torch.zeros(k, num_classes, device=device)
 
     for idx in range(0, num_test_images, imgs_per_chunk):
-        features = test_features[idx: min((idx + imgs_per_chunk), num_test_images), :]
-        targets = test_labels[idx: min((idx + imgs_per_chunk), num_test_images)]
+        features = test_features[idx : min((idx + imgs_per_chunk), num_test_images), :]
+        targets = test_labels[idx : min((idx + imgs_per_chunk), num_test_images)]
 
         # calculate dot product and compute top-k neighbors
         similarity = torch.mm(features, train_features)

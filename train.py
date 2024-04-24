@@ -5,15 +5,15 @@
 import logging
 import os
 from typing import Any
-import numpy as np
 
 import hydra
+import numpy as np
 import torch
 import torch.nn as nn
 from accelerate import Accelerator
 from accelerate.utils import set_seed
-from hydra.core.utils import JobReturn, JobStatus
 from hydra.core.hydra_config import HydraConfig
+from hydra.core.utils import JobReturn, JobStatus
 from hydra.experimental.callback import Callback
 from omegaconf import DictConfig, OmegaConf
 from torch.utils.data import DataLoader
@@ -28,6 +28,7 @@ from manifold_experiments.manifold_models import (
     TwoStageTwoHeadPredictor,
     create_encoder,
 )
+from manifold_experiments.utils.curvature import manifold_curvature
 from manifold_experiments.utils.flatten import flatten
 from manifold_experiments.utils.knn import manifold_knn
 from manifold_experiments.utils.least_square_regression import manifold_lstsq
@@ -68,7 +69,9 @@ def train(cfg: OmegaConf):
         mixed_precision=cfg.mixed_precision,
     )
 
-    run_name = f"{cfg.model.name}_{cfg.dataset.train_name}_loss_{cfg.model.manifold_loss}"
+    run_name = (
+        f"{cfg.model.name}_{cfg.dataset.train_name}_loss_{cfg.model.manifold_loss}"
+    )
     run_name += f"_lr_{cfg.learning_rate}_batch_{cfg.batch_size}_seed_{cfg.seed}"
 
     accelerator.init_trackers(
@@ -95,15 +98,16 @@ def train(cfg: OmegaConf):
 
     model = model_type(
         encoder=encoder,
-
-        linear_head=HEADS[cfg.model.classification_type](**cfg.model.classification_kwargs)
+        linear_head=HEADS[cfg.model.classification_type](
+            **cfg.model.classification_kwargs
+        )
         if OmegaConf.select(cfg, "model.classification_type")
         else None,
-
-        autoregressive_head=HEADS[cfg.model.autoregressive_type](**cfg.model.autoregressive_kwargs)
+        autoregressive_head=HEADS[cfg.model.autoregressive_type](
+            **cfg.model.autoregressive_kwargs
+        )
         if OmegaConf.select(cfg, "model.autoregressive_type")
         else None,
-
         projector=ProjectionHead(**cfg.model.projection_kwargs)
         if OmegaConf.select(cfg, "model.projection_kwargs")
         else nn.Identity(),
@@ -176,7 +180,6 @@ def train(cfg: OmegaConf):
     for epoch in range(cfg.epochs):
         # Analyze manifold
         if epoch % cfg.manifold.calculate_every == 0:
-
             manifold_statistics = {}
             with torch.no_grad():
                 if "ellipsoid" in cfg.manifold.calculate:
@@ -202,6 +205,10 @@ def train(cfg: OmegaConf):
                 if "lstsq" in cfg.manifold.calculate:
                     lstsq_results = manifold_lstsq(model, val_dataset)
                     manifold_statistics.update(lstsq_results)
+
+                if "curvature" in cfg.manifold.calculate:
+                    curvature_results = manifold_curvature(model, val_dataset)
+                    manifold_statistics.update(curvature_results)
 
         # Train
         train_loss = 0
@@ -251,25 +258,23 @@ def train(cfg: OmegaConf):
             step=epoch,
         )
 
-        # for key, value in log_obj.items():
-        #     try:
-        #         if "singular_values" in key and value is not None:
-        #             accelerator.get_tracker("aim").tracker.log_artifact(
-        #                 Histogram(value), name=key, epoch=epoch
-        #             )
-        #     except Exception:
-        #         pass
-
         accelerator.print(
             f"Epoch {epoch}: Train Loss {log_obj['train_loss']}, Val Loss {log_obj['val_loss']}"
         )
 
-    os.makedirs(str(HydraConfig.get().job.num), exist_ok=True)
+    os.makedirs(
+        os.path.join(
+            HydraConfig.get().runtime.output_dir,
+            str(HydraConfig.get().job.override_dirname),
+        ),
+        exist_ok=True,
+    )
+
     accelerator.save(
         model.state_dict(),
         os.path.join(
             HydraConfig.get().runtime.output_dir,
-            str(HydraConfig.get().job.num),
+            str(HydraConfig.get().job.override_dirname),
             "model.pth",
         ),
     )
@@ -277,7 +282,7 @@ def train(cfg: OmegaConf):
         model.encoder.state_dict(),
         os.path.join(
             HydraConfig.get().runtime.output_dir,
-            str(HydraConfig.get().job.num),
+            str(HydraConfig.get().job.override_dirname),
             "encoder.pth",
         ),
     )

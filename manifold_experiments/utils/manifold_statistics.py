@@ -518,7 +518,7 @@ def fun_FA(
 
     # Gram-Schmidt into a P-1 dimensional basis
     q, r = qr(Xb.T, mode="economic")
-    X = np.matmul(Xb, q[:, 0: P - 1])
+    X = np.matmul(Xb, q[:, 0 : P - 1])
 
     # Sore the (P, P-1) dimensional data before extracting the low rank structure
     X0 = X.copy()
@@ -614,7 +614,7 @@ def fun_FA(
             if verbose:
                 print("Optimal K0 found")
             break
-    return norm_coeff, norm_coeff_vec, q[:, 0: P - 1], V1_mat, res_coeff, res_coeff0
+    return norm_coeff, norm_coeff_vec, q[:, 0 : P - 1], V1_mat, res_coeff, res_coeff0
 
 
 def CGmanopt(X, objective_function, A, **kwargs):

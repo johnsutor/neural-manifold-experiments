@@ -1,12 +1,11 @@
+import math
 import os
 import warnings
 from typing import List, Literal, Optional
 
-import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
 from timm import create_model, list_models
 from torch.linalg import svdvals
 
@@ -106,7 +105,6 @@ class TwoStageTwoHeadPredictor(nn.Module):
         return x
 
     def get_projection(self, x: torch.Tensor) -> torch.Tensor:
-
         latents = self.get_latent(x)
         latents = torch.stack(
             [self.projector(latent) for latent in latents.unbind(dim=0)]
@@ -141,8 +139,14 @@ class MMCRTwoStageTwoHeadPredictor(TwoStageTwoHeadPredictor):
         autoregressive_head: Optional[nn.Module],
         projector: nn.Module = nn.Identity(),
         norm: Literal[0, 1] = 0,
-        manifold_loss: Literal["capacity", "radius", "dimensionality",
-                               "capacity_obj", "radius_obj", "dimensionality_obj"] = "capacity",
+        manifold_loss: Literal[
+            "capacity",
+            "radius",
+            "dimensionality",
+            "capacity_obj",
+            "radius_obj",
+            "dimensionality_obj",
+        ] = "capacity",
     ):
         super().__init__(encoder, None, autoregressive_head, projector)
         self.norm = norm
@@ -152,8 +156,9 @@ class MMCRTwoStageTwoHeadPredictor(TwoStageTwoHeadPredictor):
         # encode the frames (treat each frame as a separate sample)
         latents = self.get_projection(input)
 
-        assert latents.dim() == 3, \
-            f"Latents must have shape (batch, frame, features): shape is {latents.shape}"
+        assert (
+            latents.dim() == 3
+        ), f"Latents must have shape (batch, frame, features): shape is {latents.shape}"
 
         latents = F.normalize(latents, p=2, dim=-1)
         centroid = latents.mean(dim=1)
@@ -176,19 +181,20 @@ class MMCRTwoStageTwoHeadPredictor(TwoStageTwoHeadPredictor):
 
         # Get Radius, Dimension and Capacity from Singular Values
         rad_c = (S_c**2).sum().sqrt()
-        dim_c = S_c.sum()**2 / rad_c**2 / S_c.shape[-1]
+        dim_c = S_c.sum() ** 2 / rad_c**2 / S_c.shape[-1]
         alpha_c = rad_c * dim_c.sqrt()
 
         rad_z = (S_z**2).sum(-1).sqrt()
-        dim_z = S_z.sum(-1)**2 / (S_z**2).sum(-1) / S_z.shape[-1]
+        dim_z = S_z.sum(-1) ** 2 / (S_z**2).sum(-1) / S_z.shape[-1]
         alpha_z = rad_z * dim_z.sqrt()
 
-        losses = dict(capacity=-alpha_c,
-                      radius=-rad_c,
-                      dimensionality=-dim_c,
-                      capacity_obj=alpha_z.mean(),
-                      radius_obj=rad_z.mean(),
-                      dimensionality_obj=dim_z.mean()
-                      )
+        losses = dict(
+            capacity=-alpha_c,
+            radius=-rad_c,
+            dimensionality=-dim_c,
+            capacity_obj=alpha_z.mean(),
+            radius_obj=rad_z.mean(),
+            dimensionality_obj=dim_z.mean(),
+        )
 
         return losses

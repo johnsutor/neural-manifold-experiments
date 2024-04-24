@@ -141,7 +141,7 @@ class VideoDataset(Dataset):
                 frames = frames[0]
 
             frames = frames[
-                0: self.stride_range[1] * self.frames_per_clip: self.stride_range[1]
+                0 : self.stride_range[1] * self.frames_per_clip : self.stride_range[1]
             ]
 
             assert (
