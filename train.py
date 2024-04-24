@@ -18,7 +18,7 @@ from hydra.experimental.callback import Callback
 from omegaconf import DictConfig, OmegaConf
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-# from wandb import Histogram
+from wandb import Histogram
 
 from manifold_experiments.constants import HEADS, OPTIMIZERS
 from manifold_experiments.datasets import VideoDataset
@@ -74,7 +74,11 @@ def train(cfg: OmegaConf):
     accelerator.init_trackers(
         project_name=cfg.experiment_name,
         config=OmegaConf.to_container(cfg, enum_to_str=True),
-        init_kwargs={"wandb": {"name": run_name}},
+        init_kwargs={
+            "wandb": {
+                "name": hydra.core.hydra_config.HydraConfig.get().job.override_dirname
+            }
+        },
     )
 
     encoder = create_encoder(
@@ -103,9 +107,7 @@ def train(cfg: OmegaConf):
         projector=ProjectionHead(**cfg.model.projection_kwargs)
         if OmegaConf.select(cfg, "model.projection_kwargs")
         else nn.Identity(),
-
         norm=OmegaConf.select(cfg, "model.norm"),
-
         manifold_loss=OmegaConf.select(cfg, "model.manifold_loss", default="capacity"),
     )
 
