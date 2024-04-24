@@ -26,7 +26,8 @@ class CustomMovingMnistPyTorchDataset(Dataset):
         return len(self.frames)
 
     def __getitem__(self, idx):
-        """Returns the video frames, the digit, the angle, the x position, the y position, and the speed (in that order)"""
+        """Returns the video frames, the digit, the angle,
+        the x position, the y position, and the speed (in that order)"""
 
         # Return first ten if train, last ten if test
         if self.train:
@@ -140,7 +141,7 @@ class VideoDataset(Dataset):
                 frames = frames[0]
 
             frames = frames[
-                0 : self.stride_range[1] * self.frames_per_clip : self.stride_range[1]
+                0: self.stride_range[1] * self.frames_per_clip: self.stride_range[1]
             ]
 
             assert (

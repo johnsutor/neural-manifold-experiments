@@ -104,7 +104,8 @@ def get_feature_extractor(model, return_nodes):
         return_nodes
     ).issubset(
         get_graph_node_names(model)[1]
-    ), f"Invalid node names, available nodes are:\n{','.join(get_graph_node_names(model)[1])}, but requested nodes are:\n{','.join(return_nodes)}"
+    ), f"Invalid node names, available nodes are:\n{','.join(get_graph_node_names(model)[1])}, \
+        but requested nodes are:\n{','.join(return_nodes)}"
 
     model = model.eval()
     feature_extractor = create_feature_extractor(model, return_nodes=list(return_nodes))
@@ -117,7 +118,8 @@ def extract_activations(dataset: List[torch.tensor], module: nn.Module):
 
     Args:
         data: Iterable containing manifold input data
-        module: PyTorch module to compute the statistics for (must be a feature extractor that returns a dictionary of layer activations, i.e. {'layer_name': activations})
+        module: PyTorch module to compute the statistics for
+        (must be a feature extractor that returns a dictionary of layer activations, i.e. {'layer_name': activations})
 
     Returns:
         activations: Dictionary containing the activations for each node
@@ -516,7 +518,7 @@ def fun_FA(
 
     # Gram-Schmidt into a P-1 dimensional basis
     q, r = qr(Xb.T, mode="economic")
-    X = np.matmul(Xb, q[:, 0 : P - 1])
+    X = np.matmul(Xb, q[:, 0: P - 1])
 
     # Sore the (P, P-1) dimensional data before extracting the low rank structure
     X0 = X.copy()
@@ -612,7 +614,7 @@ def fun_FA(
             if verbose:
                 print("Optimal K0 found")
             break
-    return norm_coeff, norm_coeff_vec, q[:, 0 : P - 1], V1_mat, res_coeff, res_coeff0
+    return norm_coeff, norm_coeff_vec, q[:, 0: P - 1], V1_mat, res_coeff, res_coeff0
 
 
 def CGmanopt(X, objective_function, A, **kwargs):

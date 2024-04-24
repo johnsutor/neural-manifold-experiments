@@ -100,7 +100,8 @@ class CustomMovingMnistDataset:
             speed (float): The speed of movement
 
         Returns:
-            Tuple(np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray): The video frames, the digit, the angle, the x position, the y position, and the speed
+            Tuple(np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray):
+            The video frames, the digit, the angle, the x position, the y position, and the speed
         """
         # Get how many pixels can we move around a single image
 
@@ -234,7 +235,8 @@ class CustomMovingMnistDataset:
             with h5py.File(
                 os.path.join(
                     self.dir,
-                    f"custom_mmnist_seed_{self.seed}_shape_{self.shape[0]}x{self.shape[1]}_frames_{num_frames}_digit_size_{self.digit_size}_preset_{preset}.h5",
+                    f"custom_mmnist_seed_{self.seed}_shape_{self.shape[0]}x{self.shape[1]}_\
+                        frames_{num_frames}_digit_size_{self.digit_size}_preset_{preset}.h5",
                 ),
                 "w",
             ) as hf:

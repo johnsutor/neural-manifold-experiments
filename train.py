@@ -5,6 +5,7 @@
 import logging
 import os
 from typing import Any
+import numpy as np
 
 import hydra
 import torch
@@ -12,6 +13,7 @@ import torch.nn as nn
 from accelerate import Accelerator
 from accelerate.utils import set_seed
 from hydra.core.utils import JobReturn, JobStatus
+from hydra.core.hydra_config import HydraConfig
 from hydra.experimental.callback import Callback
 from omegaconf import DictConfig, OmegaConf
 from torch.utils.data import DataLoader
@@ -54,7 +56,7 @@ class LogJobReturnCallback(Callback):
             self.log.error("Status unknown. This should never happen.")
 
 
-@hydra.main(config_path="configs", config_name="train", version_base="1.1")
+@hydra.main(config_path="configs", config_name="mmcr_train", version_base="1.1")
 def train(cfg: OmegaConf):
     print(OmegaConf.to_yaml(cfg), flush=True)
     set_seed(cfg.seed)
@@ -62,9 +64,12 @@ def train(cfg: OmegaConf):
     accelerator = Accelerator(
         cpu=cfg.cpu,
         log_with="wandb",
-        project_dir=hydra.core.hydra_config.HydraConfig.get().runtime.output_dir,
+        project_dir=HydraConfig.get().runtime.output_dir,
         mixed_precision=cfg.mixed_precision,
     )
+
+    run_name = f"{cfg.model.name}_{cfg.dataset.train_name}_loss_{cfg.model.manifold_loss}"
+    run_name += f"_lr_{cfg.learning_rate}_batch_{cfg.batch_size}_seed_{cfg.seed}"
 
     accelerator.init_trackers(
         project_name=cfg.experiment_name,
@@ -90,16 +95,15 @@ def train(cfg: OmegaConf):
 
     model = model_type(
         encoder=encoder,
-        linear_head=HEADS[cfg.model.classification_type](
-            **cfg.model.classification_kwargs
-        )
+
+        linear_head=HEADS[cfg.model.classification_type](**cfg.model.classification_kwargs)
         if OmegaConf.select(cfg, "model.classification_type")
         else None,
-        autoregressive_head=HEADS[cfg.model.autoregressive_type](
-            **cfg.model.autoregressive_kwargs
-        )
+
+        autoregressive_head=HEADS[cfg.model.autoregressive_type](**cfg.model.autoregressive_kwargs)
         if OmegaConf.select(cfg, "model.autoregressive_type")
         else None,
+
         projector=ProjectionHead(**cfg.model.projection_kwargs)
         if OmegaConf.select(cfg, "model.projection_kwargs")
         else nn.Identity(),
@@ -172,14 +176,19 @@ def train(cfg: OmegaConf):
     for epoch in range(cfg.epochs):
         # Analyze manifold
         if epoch % cfg.manifold.calculate_every == 0:
+
+            manifold_statistics = {}
             with torch.no_grad():
-                manifold_statistics = {}
-                feature_extractor = get_feature_extractor(
-                    model.encoder, cfg.manifold.return_nodes
-                )
-                activations = extract_activations(
-                    sampled_manifold_dataset, feature_extractor
-                )
+                if "ellipsoid" in cfg.manifold.calculate:
+                    feature_extractor = get_feature_extractor(
+                        model.encoder, cfg.manifold.return_nodes
+                    )
+                    activations = extract_activations(
+                        sampled_manifold_dataset, feature_extractor
+                    )
+                    analysis = manifold_analysis(activations, cfg.manifold.calculate)
+                    manifold_statistics.update(analysis)
+
                 if "knn" in cfg.manifold.calculate:
                     knn_results = manifold_knn(
                         model,
@@ -194,32 +203,40 @@ def train(cfg: OmegaConf):
                     lstsq_results = manifold_lstsq(model, val_dataset)
                     manifold_statistics.update(lstsq_results)
 
-                analysis = manifold_analysis(activations, cfg.manifold.calculate)
-                manifold_statistics.update(analysis)
-
         # Train
         train_loss = 0
         model.train()
         for data, label in tqdm(train_dataloader, desc=f"Train Epoch {epoch}"):
             optimizer.zero_grad(set_to_none=True)
-            loss = model.calculate_loss(data, label)
+            losses = model.calculate_loss(data, label)
+            assert type(losses) is dict, "Losses must be returned in a dictionary"
+
+            loss = losses[model.manifold_loss]
             accelerator.backward(loss)
             optimizer.step()
             train_loss += loss.item()
 
         # Validation
-        val_loss = 0
+        val_losses = dict()
         model.eval()
         with torch.no_grad():
             for data, label in tqdm(val_dataloader, desc=f"Val Epoch {epoch}"):
-                loss = model.calculate_loss(data, label)
-                val_loss += loss.item()
+                losses = model.calculate_loss(data, label)
+                assert type(losses) is dict, "Losses must be returned in a dictionary"
+                if len(val_losses) == 0:
+                    for key, val in losses.items():
+                        val_losses[key] = [val.item()]
+                else:
+                    for key, val in losses.items():
+                        val_losses[key] += [val.item()]
+        val_losses = {key: np.mean(val) for key, val in val_losses.items()}
 
         # Log to tensorboard
         log_obj = {
             "train_loss": train_loss / len(train_dataloader),
-            "val_loss": val_loss / len(val_dataloader),
+            "val_loss": val_losses[model.manifold_loss],
             "epoch": epoch,
+            **val_losses,
             **manifold_statistics,
         }
 
@@ -234,33 +251,33 @@ def train(cfg: OmegaConf):
             step=epoch,
         )
 
-        for key, value in log_obj.items():
-            try:
-                if "singular_values" in key and value is not None:
-                    accelerator.get_tracker("aim").tracker.log_artifact(
-                        Histogram(value), name=key, epoch=epoch
-                    )
-            except:
-                pass
+        # for key, value in log_obj.items():
+        #     try:
+        #         if "singular_values" in key and value is not None:
+        #             accelerator.get_tracker("aim").tracker.log_artifact(
+        #                 Histogram(value), name=key, epoch=epoch
+        #             )
+        #     except Exception:
+        #         pass
 
         accelerator.print(
             f"Epoch {epoch}: Train Loss {log_obj['train_loss']}, Val Loss {log_obj['val_loss']}"
         )
 
-    os.makedirs(str(hydra.core.hydra_config.HydraConfig.get().job.num), exist_ok=True)
+    os.makedirs(str(HydraConfig.get().job.num), exist_ok=True)
     accelerator.save(
         model.state_dict(),
         os.path.join(
-            hydra.core.hydra_config.HydraConfig.get().runtime.output_dir,
-            str(hydra.core.hydra_config.HydraConfig.get().job.num),
+            HydraConfig.get().runtime.output_dir,
+            str(HydraConfig.get().job.num),
             "model.pth",
         ),
     )
     torch.save(
         model.encoder.state_dict(),
         os.path.join(
-            hydra.core.hydra_config.HydraConfig.get().runtime.output_dir,
-            str(hydra.core.hydra_config.HydraConfig.get().job.num),
+            HydraConfig.get().runtime.output_dir,
+            str(HydraConfig.get().job.num),
             "encoder.pth",
         ),
     )
