@@ -137,13 +137,17 @@ def extract_activations(dataset: List[torch.tensor], module: nn.Module):
         acts = module.forward(data.to(device))
         for key in acts:
             activations[key].append(
-                acts[key].reshape(acts[key].shape[0], -1).T.detach().cpu().numpy()
+                acts[key]
+                .reshape(acts[key].shape[0], -1)
+                .T.detach()  # NOTE: This will break the full (non-ellipsoid) calculations, since it expects numpy array
             )
 
     return activations
 
 
-def manifold_analysis(activations: dict, compute=["full", "ellipsoid"]):
+def manifold_analysis(
+    activations: dict, compute=["full", "ellipsoid"], device: torch.device = "cpu"
+):
     """
     Computes the manifold statistics for a set of activations
 
@@ -156,9 +160,15 @@ def manifold_analysis(activations: dict, compute=["full", "ellipsoid"]):
     # Compute the statistics
     statistics = {}
     for key in tqdm(activations.keys(), desc="Computing manifold statistics"):
-        manifold_stats = manifold_analysis_corr(
-            activations[key], 0, 300, n_reps=1, compute=compute
-        )
+        if "ellipsoid" in compute:
+            manifold_stats = pytorch_manifold_analysis_ellipsoid(
+                activations[key], device=device
+            )
+
+        if "full" in compute:
+            manifold_stats = manifold_analysis_corr(
+                activations[key], 0, 300, n_reps=1, compute=["full"]
+            )
 
         # Update the statistics dictionary structure
         # i.e. from statistics['node_name']['statistic_name']
@@ -167,6 +177,58 @@ def manifold_analysis(activations: dict, compute=["full", "ellipsoid"]):
             if subkey not in statistics:
                 statistics[subkey] = {}
             statistics[subkey][key] = value
+
+    return statistics
+
+
+def pytorch_manifold_analysis_ellipsoid(
+    XtotT: torch.tensor,
+    device: torch.device,
+    projection=5000,
+):
+    """
+    Carry out the ananlysis on multiple manifolds, using PyTorch
+
+    Args:
+        XtotT: Sequence of 2D arrays of shape (N, P_i) where N is the dimensionality
+            of the space, and P_i is the number of sampled points for the i_th manifold.
+        device: Device to perform calculations on
+
+    Returns:
+        dictionary of statistics
+    """
+    # Number of manifolds to analyze
+    num_manifolds = len(XtotT)
+
+    N = XtotT[0].shape[0]
+    # If N is greater than projection, do the random projection to projection features
+    if N > projection:
+        M = torch.randn(projection, N).to(device)
+        M /= torch.sqrt(torch.sum(M * M, axis=1, keepdims=True))
+        XtotT = [torch.matmul(M, d) for d in XtotT]
+
+    # Compute the mean for each manifold
+    centers = [torch.mean(XtotT[i], axis=1) for i in range(num_manifolds)]
+    centers = torch.stack(centers, axis=1)  # Centers is of shape (N, m) for m manifolds
+    center_mean = torch.mean(
+        centers, axis=1, keepdims=True
+    )  # (N, 1) mean of all centers
+
+    # Center correlation analysis
+    SS = torch.linalg.svdvals(centers - center_mean)
+    sum_sq = torch.square(torch.abs(SS).sum())
+    # Computes the sum of the squared eigenvalues
+    sq_sum = (torch.square(SS)).sum()
+
+    D = sum_sq / sq_sum
+    R = sq_sum**0.5
+    alpha = SS.sum()
+    statistics = {
+        "D_ellipsoid": D.item(),
+        "R_ellipsoid": R.item(),
+        "alpha_ellipsoid": alpha.item(),
+        "singular_values": SS.cpu().numpy(),
+    }
 
     return statistics
 

@@ -189,7 +189,11 @@ def train(cfg: OmegaConf):
                     activations = extract_activations(
                         sampled_manifold_dataset, feature_extractor
                     )
-                    analysis = manifold_analysis(activations, cfg.manifold.calculate)
+                    analysis = manifold_analysis(
+                        activations,
+                        cfg.manifold.calculate,
+                        device=next(model.parameters()).device,
+                    )
                     manifold_statistics.update(analysis)
 
                 if "knn" in cfg.manifold.calculate:
