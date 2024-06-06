@@ -1,11 +1,12 @@
 train_kwargs:
-  root: ${oc.env:EXPERIMENT_ROOT}/data/custom_mmnist_seed_42_shape_64x64_frames_20_digit_size_28_preset_horizontal-right.h5
+  root: ${oc.env:EXPERIMENT_ROOT}/data/custom_mmnist_seed_42_shape_64x64_frames_20_digit_size_28_preset_random.h5
+  # custom_mmnist_seed_42_shape_64x64_frames_20_digit_size_28_preset_horizontal-right.h5
   train: true
 
 train_name: "custom_moving_mnist"
 
 val_kwargs:
-  root: ${oc.env:EXPERIMENT_ROOT}/data/custom_mmnist_seed_42_shape_64x64_frames_20_digit_size_28_preset_horizontal-right.h5
+  root: ${oc.env:EXPERIMENT_ROOT}/data/custom_mmnist_seed_42_shape_64x64_frames_20_digit_size_28_preset_random.h5
   train: false
 
 val_name: "custom_moving_mnist"

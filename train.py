@@ -10,6 +10,7 @@ import hydra
 import numpy as np
 import torch
 import torch.nn as nn
+import wandb
 from accelerate import Accelerator
 from accelerate.utils import set_seed
 from hydra.core.hydra_config import HydraConfig
@@ -17,8 +18,8 @@ from hydra.core.utils import JobReturn, JobStatus
 from hydra.experimental.callback import Callback
 from omegaconf import DictConfig, OmegaConf
 from torch.utils.data import DataLoader
+from torchvision.utils import make_grid
 from tqdm import tqdm
-from wandb import Histogram
 
 from manifold_experiments.constants import HEADS, OPTIMIZERS
 from manifold_experiments.datasets import VideoDataset
@@ -59,7 +60,7 @@ class LogJobReturnCallback(Callback):
 
 @hydra.main(config_path="configs", config_name="mmcr_train", version_base="1.1")
 def train(cfg: OmegaConf):
-    print(OmegaConf.to_yaml(cfg), flush=True)
+    print(OmegaConf.to_yaml(cfg))
     set_seed(cfg.seed)
 
     accelerator = Accelerator(
@@ -175,6 +176,23 @@ def train(cfg: OmegaConf):
 
     model, optimizer, train_dataloader, val_dataloader = accelerator.prepare(
         model, optimizer, train_dataloader, val_dataloader
+    )
+
+    # Log the first item from the batch to wandb as a sanity check
+    print(f"Batch item is of shape {train_dataset[0][0].shape}")
+    wandb_tracker = accelerator.get_tracker("wandb")
+    wandb_tracker.log(
+        {
+            "example_frames": wandb.Image(
+                make_grid(
+                    train_dataset[0][0],
+                    nrow=cfg.dataset.frames_per_clip,
+                    normalize=True,
+                ),
+                caption="Example Frames",
+            )
+        },
+        step=0,
     )
 
     for epoch in range(cfg.epochs):

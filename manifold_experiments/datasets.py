@@ -5,6 +5,7 @@ import h5py
 import torch
 from torch.utils.data import Dataset
 from torchvision.datasets import MNIST, Kinetics, MovingMNIST
+from torchvision.transforms.v2 import Compose, ToDtype, ToImage
 
 from manifold_experiments.constants import TARGET_TRANSFORMS, TRANSFORMS
 from manifold_experiments.physion import PhysionAllDataset
@@ -109,8 +110,13 @@ class VideoDataset(Dataset):
                 **self.kwargs,
             )
         elif self.name == "mnist":
-            self.data = MNIST(root=self.root, **self.kwargs)
-            self.frames_per_clip = 1
+            self.data = MNIST(
+                root=self.root,
+                **self.kwargs,
+                transform=Compose([ToImage(), ToDtype(torch.float32, scale=True)]),
+            )
+            # WARNING: This may cause issues if just doing classification, be warned
+            # self.frames_per_clip = 1
         elif self.name == "kinetics":
             self.data = Kinetics(
                 root=self.root,
@@ -160,11 +166,22 @@ class VideoDataset(Dataset):
         elif self.name == "custom_moving_mnist":
             frames, labels, angles, xs, ys, speeds = self.data[idx]
             frames = torch.from_numpy(frames).float().unsqueeze(1)
-        else:
+        elif self.name == "mnist":
             frames, labels = self.data[idx]
 
+        else:
+            raise NotImplementedError(
+                "This dataset's loading scheme has not been implemented"
+            )
+
         if self.transform:
-            frames = self.transform(frames)
+            if self.name == "mnist":
+                # Have to process each frame separately so that all aren't same transform
+                frames = torch.cat(
+                    [self.transform(frames) for _ in range(self.frames_per_clip)], dim=0
+                )
+            else:
+                frames = self.transform(frames)
 
         video_len = len(frames)
         frames_per_clip = self.frames_per_clip

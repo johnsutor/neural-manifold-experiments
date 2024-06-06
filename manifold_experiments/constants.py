@@ -7,6 +7,8 @@ from torchvision.transforms.v2 import (
     Lambda,
     Normalize,
     RandomCrop,
+    RandomPerspective,
+    RandomRotation,
     Resize,
     ToDtype,
     ToImage,
@@ -25,7 +27,12 @@ HEADS = {
     "flatten": torch.nn.Flatten,
 }
 
-OPTIMIZERS = {"adam": torch.optim.Adam, "sgd": torch.optim.SGD, "lars": Lars}
+OPTIMIZERS = {
+    "adam": torch.optim.Adam,
+    "sgd": torch.optim.SGD,
+    "lars": Lars,
+    "adamw": torch.optim.AdamW,
+}
 
 SCHEDULERS = {
     "step": torch.optim.lr_scheduler.StepLR,
@@ -35,9 +42,9 @@ SCHEDULERS = {
 TRANSFORMS = {
     "mnist": Compose(
         [
-            ToImage(),
-            ToDtype(torch.float32, scale=True),
             RandomCrop((64, 64), padding=36),
+            RandomPerspective(distortion_scale=0.5, p=0.5),
+            RandomRotation(degrees=45),
             Normalize(mean=[0.5], std=[0.5]),
             Lambda(lambda x: x.unsqueeze(0)),
         ]

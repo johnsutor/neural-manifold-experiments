@@ -10,9 +10,8 @@ seed: 42
 cpu: false
 mixed_precision: 'no'
 learning_rate: 0.005
-epochs: 51 # One extra epoch for the final evaluation
+steps: 100000
 
-# Dataloader 
 shuffle: true
 num_workers: 4
 pin_memory: true

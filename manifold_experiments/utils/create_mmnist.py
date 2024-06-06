@@ -1,6 +1,6 @@
-# John Sutor
-# 2024-02-12
-# CLI to create a moving MNIST dataset
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 import argparse
 import gzip
 import os
@@ -29,12 +29,14 @@ class CustomMovingMnistDataset:
         n_jobs: int = 4,
         shape=(64, 64),
         digit_size=28,
+        transition: bool = False,
     ):
         self.seed = seed
         self.dir = dir
         args.n_jobs = n_jobs
         self.shape = shape
         self.digit_size = digit_size
+        self.transition = transition
         self.class_to_locs = defaultdict(list)
         self.images, self.labels = self._load_dataset()
 
@@ -64,21 +66,23 @@ class CustomMovingMnistDataset:
             ret = ret.reshape(h, w)
         return ret
 
-    def download(self, filename, source="http://yann.lecun.com/exdb/mnist/"):
-        urlretrieve(source + filename, os.path.join(self.dir, filename))
+    def download(
+        self, filename, source="https://storage.googleapis.com/cvdf-datasets/mnist"
+    ):
+        urlretrieve(os.path.join(source, filename), os.path.join(self.dir, filename))
 
     def load_mnist_images(self, filename):
-        if not os.path.exists(filename):
+        if not os.path.exists(os.path.join(self.dir, filename)):
             self.download(filename)
-        with gzip.open(filename, "rb") as f:
+        with gzip.open(os.path.join(self.dir, filename), "rb") as f:
             data = np.frombuffer(f.read(), np.uint8, offset=16)
         data = data.reshape(-1, 1, 28, 28).transpose(0, 1, 3, 2)
         return data / np.float32(255)
 
     def load_mnist_labels(self, filename):
-        if not os.path.exists(filename):
+        if not os.path.exists(os.path.join(self.dir, filename)):
             self.download(filename)
-        with gzip.open(filename, "rb") as f:
+        with gzip.open(os.path.join(self.dir, filename), "rb") as f:
             data = np.frombuffer(f.read(), np.uint8, offset=8)
         return data
 
@@ -113,11 +117,15 @@ class CustomMovingMnistDataset:
             self.images_to_arr(np.random.choice(self.class_to_locs[digit]))
         )
 
-        img_to = Image.fromarray(
-            self.images_to_arr(
-                np.random.choice(self.class_to_locs[self.class_transitions[digit]])
+        if self.transition:
+            img_to = Image.fromarray(
+                self.images_to_arr(
+                    np.random.choice(self.class_to_locs[self.class_transitions[digit]])
+                )
             )
-        )
+
+        else:
+            img_to = img_from
 
         digits = []
         angles = []
@@ -168,7 +176,15 @@ class CustomMovingMnistDataset:
         save: bool = False,
         compress: int = 4,
     ) -> Union[List[np.ndarray], None]:
-        """Generate a dataset of moving MNIST videos."""
+        """Generate a dataset of moving MNIST videos.
+
+        Args:
+            n (int): Number of videos to generate
+            num_frames (int): Number of frames per video
+            preset (str): Preset for the initial conditions
+            save (bool): Whether to save the dataset
+            compress (int): H5 compression level
+        """
         digit = np.random.randint(0, 10, n)
 
         if preset == "random":
@@ -197,15 +213,26 @@ class CustomMovingMnistDataset:
             initial_y = np.random.rand(n)
             speed = self.x_lim / num_frames * np.ones(n)
 
-        # Use joblib to parallelize the generation of frames
-        results = joblib.Parallel(n_jobs=args.n_jobs)(
-            joblib.delayed(self.generate_single_vid)(d, ang, x, y, s)
-            for d, ang, x, y, s in tqdm(
-                zip(digit, initial_angle, initial_x, initial_y, speed),
-                total=n,
-                desc="Generating Frames",
+        if args.n_jobs == 1:
+            results = [
+                self.generate_single_vid(d, ang, x, y, s)
+                for d, ang, x, y, s in tqdm(
+                    zip(digit, initial_angle, initial_x, initial_y, speed),
+                    total=n,
+                    desc="Generating Frames",
+                )
+            ]
+
+        else:
+            # Use joblib to parallelize the generation of frames
+            results = joblib.Parallel(n_jobs=args.n_jobs)(
+                joblib.delayed(self.generate_single_vid)(d, ang, x, y, s)
+                for d, ang, x, y, s in tqdm(
+                    zip(digit, initial_angle, initial_x, initial_y, speed),
+                    total=n,
+                    desc="Generating Frames",
+                )
             )
-        )
 
         all_frames = []
         all_digits = []
@@ -235,8 +262,7 @@ class CustomMovingMnistDataset:
             with h5py.File(
                 os.path.join(
                     self.dir,
-                    f"custom_mmnist_seed_{self.seed}_shape_{self.shape[0]}x{self.shape[1]}_\
-                        frames_{num_frames}_digit_size_{self.digit_size}_preset_{preset}.h5",
+                    f"custom_mmnist_seed_{self.seed}_shape_{self.shape[0]}x{self.shape[1]}_frames_{num_frames}_digit_size_{self.digit_size}_preset_{preset}.h5",
                 ),
                 "w",
             ) as hf:
@@ -284,10 +310,7 @@ if __name__ == "__main__":
         required=True,
     )
     parser.add_argument(
-        "-n",
-        type=int,
-        help="Number of videos to generate",
-        required=True,
+        "-n", type=int, help="Number of videos to generate", default=60_000
     )
     parser.add_argument(
         "--seed",
@@ -308,10 +331,16 @@ if __name__ == "__main__":
         default=4,
     )
     parser.add_argument(
+        "--transition",
+        action="store_true",
+        default=False,
+        help="Whether to transition digit based on n -> n + 1 % 9",
+    )
+    parser.add_argument(
         "--num_frames",
         type=int,
         help="Number of frames per video",
-        default=30,
+        default=20,
     )
     parser.add_argument(
         "--preset",
@@ -333,8 +362,11 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
+    print(f"Running with {args}")
 
-    dataset = CustomMovingMnistDataset(seed=args.seed, dir=args.dir, n_jobs=args.n_jobs)
+    dataset = CustomMovingMnistDataset(
+        seed=args.seed, dir=args.dir, n_jobs=args.n_jobs, transition=args.transition
+    )
     dataset.generate_dataset(
         args.n,
         num_frames=args.num_frames,
